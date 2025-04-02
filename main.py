@@ -9,6 +9,7 @@ def main ():
     logging.getLogger("ultralytics").setLevel(logging.CRITICAL)
 
     label = []
+    color = []
 
     #Initializes the detector
     detector = Detector(model_path= "yolov8n.pt")
@@ -27,7 +28,8 @@ def main ():
             print("Failed to grab frame.")
             break
         
-        frame, labels = detector.detectObject(frame)
+        frame, labels, boxes = detector.detectObject(frame)
+        objectColor = detector.detectColor(frame, boxes)
 
         cv2.imshow("Lost and Found Detection", frame)
 
@@ -35,6 +37,12 @@ def main ():
             while(len(label) < 20 ):
                 label.append(labels)
                 print(label)
+            cv2.imwrite("frame.jpg", frame)
+
+        if objectColor:
+            while(len(color) < 20):
+                color.append(objectColor)
+                print(color)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
