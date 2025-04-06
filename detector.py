@@ -5,7 +5,7 @@ import numpy as np
 
 class Detector():
     
-    def __init__(self, model_path="yolov8n.pt", device=None):
+    def __init__(self, model_path="best.pt", device=None):
         self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {self.device}")
 
