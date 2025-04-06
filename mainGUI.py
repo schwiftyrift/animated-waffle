@@ -3,6 +3,7 @@ import cv2
 from detector import Detector
 import logging
 from PIL import Image, ImageTk
+from Database import *
 
 # Create GUI instance
 GUI = Tk()
@@ -19,7 +20,7 @@ GUI.bind('<Escape>', lambda e: GUI.quit())
 logging.getLogger("ultralytics").setLevel(logging.CRITICAL)
 
 # Initializes the detector
-detector = Detector(model_path="yolov8n.pt")
+detector = Detector(model_path="best.pt")
 
 # Open webcam
 capture = cv2.VideoCapture(0)
@@ -29,9 +30,17 @@ if not capture.isOpened():
     print("Error: Could not open webcam.")
     exit()
 
+#Text entry box
+description_entry = None
+item_entry = None
+location_entry = None
+color_entry = None
+
 # Trackers
 label = []
 color = []
+description = ""
+
 pressed = False
 last_detected_frame = None
 continue_updating = True
@@ -104,7 +113,19 @@ instructions = Label(
 )
 instructions.pack(anchor='n', side=TOP, fill=X)
 
+def submit():
+    global label
+    global color
+    global description_entry
+
+    description = description_entry.get()
+    inputData(label[0], color[0], description)
+    return_to_main()
+
 def return_to_main():
+    global label
+    global color
+
     second_frame.pack_forget()
 
     # Clear second_frame to avoid clutter next time
@@ -116,6 +137,9 @@ def return_to_main():
     pressed = False
     continue_updating = True
 
+    label = []
+    color = []
+    
     main_frame.pack(anchor="nw", padx=30, pady=50)
     update_frame()
 
@@ -124,6 +148,11 @@ def show_second_screen():
         widget.destroy()
     
     global last_detected_frame
+    global description_entry
+    global item_entry
+    global location_entry
+    global color_entry
+
 
     main_frame.pack_forget()
     second_frame.pack(anchor="nw", padx=30, pady=50)
@@ -198,7 +227,7 @@ def show_second_screen():
 
     submit_button = Button(right_frame2,
         text="Submit",
-        command=return_to_main,
+        command=submit,
         font=("Helvetica", 12),
         bg="#4CAF50",
         fg="white",
