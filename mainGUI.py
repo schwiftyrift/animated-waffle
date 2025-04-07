@@ -3,6 +3,7 @@ import cv2
 from detector import Detector
 import logging
 from PIL import Image, ImageTk
+from Database import *
 
 # Create GUI instance
 GUI = Tk()
@@ -19,7 +20,7 @@ GUI.bind('<Escape>', lambda e: GUI.quit())
 logging.getLogger("ultralytics").setLevel(logging.CRITICAL)
 
 # Initializes the detector
-detector = Detector(model_path="yolov8n.pt")
+detector = Detector(model_path="best.pt")
 
 # Open webcam
 capture = cv2.VideoCapture(0)
@@ -29,12 +30,21 @@ if not capture.isOpened():
     print("Error: Could not open webcam.")
     exit()
 
+#Text entry box
+description_entry = None
+item_entry = None
+location_entry = None
+color_entry = None
+
 # Trackers
 label = []
 color = []
+description = ""
+boxes = []
 pressed = False
 last_detected_frame = None
 continue_updating = True
+second_photo = False
 
 # --- Layout Frame ---
 main_frame = Frame(GUI, bg="#1e1f1e")
@@ -104,7 +114,37 @@ instructions = Label(
 )
 instructions.pack(anchor='n', side=TOP, fill=X)
 
+def takePhoto(frame, boxes, id):
+        croppedFrame = None
+        if boxes != None:
+            for box in boxes:
+                if len(box) == 4:  # Ensure valid bounding box
+                    x1, y1, x2, y2 = box
+                    croppedFrame = frame[y1:y2, x1:x2]
+                    cv2.imwrite(f"{id + "(1)"}.jpg", croppedFrame)
+        else:
+            cv2.imwrite(f"{id  + "(2)"}.jpg", frame)   
+        return
+
+def submit():
+    global label
+    global color
+    global description_entry
+
+    description = description_entry.get()
+    lab = item_entry.get()
+    col = color_entry.get()
+    loc = location_entry.get()
+
+    id = inputData(lab, col, description, loc)
+
+    takePhoto(last_detected_frame, boxes, id)
+    return_to_main()
+
 def return_to_main():
+    global label
+    global color
+
     second_frame.pack_forget()
 
     # Clear second_frame to avoid clutter next time
@@ -116,6 +156,9 @@ def return_to_main():
     pressed = False
     continue_updating = True
 
+    label = []
+    color = []
+    
     main_frame.pack(anchor="nw", padx=30, pady=50)
     update_frame()
 
@@ -124,6 +167,11 @@ def show_second_screen():
         widget.destroy()
     
     global last_detected_frame
+    global description_entry
+    global item_entry
+    global location_entry
+    global color_entry
+
 
     main_frame.pack_forget()
     second_frame.pack(anchor="nw", padx=30, pady=50)
@@ -198,7 +246,7 @@ def show_second_screen():
 
     submit_button = Button(right_frame2,
         text="Submit",
-        command=return_to_main,
+        command=submit,
         font=("Helvetica", 12),
         bg="#4CAF50",
         fg="white",
@@ -224,6 +272,7 @@ def update_frame():
     cleanFrame = frame.copy()
     
     if pressed:
+        global boxes
         frame_with_boxes, labels, boxes = detector.detectObject(frame)
         last_detected_frame = cleanFrame.copy()  # clean version for later
 
