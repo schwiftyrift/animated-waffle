@@ -16,7 +16,6 @@ class Detector():
         labels = []
         boxes = []
 
-        frameCopy = frame.copy()
         results = self.model(frame)[0]
 
         for box in results.boxes:
@@ -34,8 +33,6 @@ class Detector():
 
                     labels.append(label)
                     boxes.append((x1, y1, x2, y2))  # Store bounding box as tuple
-        
-        self.takePhoto(frameCopy, boxes)
 
         return frame, labels, boxes
 
@@ -98,11 +95,3 @@ class Detector():
                 colors.append(dominant_color)
 
         return colors
-    
-    def takePhoto(self, frame, boxes):
-        for box in boxes:
-            if len(box) == 4:  # Ensure valid bounding box
-                x1, y1, x2, y2 = box
-                croppedFrame = frame[y1:y2, x1:x2]
-                cv2.imwrite("photo.jpg", croppedFrame)    
-        return

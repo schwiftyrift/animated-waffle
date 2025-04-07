@@ -40,10 +40,11 @@ color_entry = None
 label = []
 color = []
 description = ""
-
+boxes = []
 pressed = False
 last_detected_frame = None
 continue_updating = True
+second_photo = False
 
 # --- Layout Frame ---
 main_frame = Frame(GUI, bg="#1e1f1e")
@@ -113,13 +114,31 @@ instructions = Label(
 )
 instructions.pack(anchor='n', side=TOP, fill=X)
 
+def takePhoto(frame, boxes, id):
+        croppedFrame = None
+        if boxes != None:
+            for box in boxes:
+                if len(box) == 4:  # Ensure valid bounding box
+                    x1, y1, x2, y2 = box
+                    croppedFrame = frame[y1:y2, x1:x2]
+                    cv2.imwrite(f"{id + "(1)"}.jpg", croppedFrame)
+        else:
+            cv2.imwrite(f"{id  + "(2)"}.jpg", frame)   
+        return
+
 def submit():
     global label
     global color
     global description_entry
 
     description = description_entry.get()
-    inputData(label[0], color[0], description)
+    lab = item_entry.get()
+    col = color_entry.get()
+    loc = location_entry.get()
+
+    id = inputData(lab, col, description, loc)
+
+    takePhoto(last_detected_frame, boxes, id)
     return_to_main()
 
 def return_to_main():
@@ -253,6 +272,7 @@ def update_frame():
     cleanFrame = frame.copy()
     
     if pressed:
+        global boxes
         frame_with_boxes, labels, boxes = detector.detectObject(frame)
         last_detected_frame = cleanFrame.copy()  # clean version for later
 
