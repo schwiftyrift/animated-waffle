@@ -4,6 +4,10 @@ from detector import Detector
 import logging
 from PIL import Image, ImageTk
 from Database import *
+import os
+
+img_directory = "images"
+os.makedirs(img_directory, exist_ok=True)
 
 # Create GUI instance
 GUI = Tk()
@@ -35,6 +39,12 @@ description_entry = None
 item_entry = None
 location_entry = None
 color_entry = None
+result_label = None
+
+# buttons
+capture_button = None
+photo_button = None
+toggle_button = None
 
 # Trackers
 label = []
@@ -43,7 +53,10 @@ description = ""
 boxes = []
 pressed = False
 last_detected_frame = None
+second_detected_frame = None
 continue_updating = True
+live_preview_running = False
+currently_showing_live_capture = True
 second_photo = False
 
 # --- Layout Frame ---
@@ -114,36 +127,111 @@ instructions = Label(
 )
 instructions.pack(anchor='n', side=TOP, fill=X)
 
-def takePhoto(frame, boxes, id):
+def savePhoto(frame, id, boxes = None):
         croppedFrame = None
         if boxes != None:
             for box in boxes:
                 if len(box) == 4:  # Ensure valid bounding box
                     x1, y1, x2, y2 = box
                     croppedFrame = frame[y1:y2, x1:x2]
-                    cv2.imwrite(f"{id + "(1)"}.jpg", croppedFrame)
+                    cv2.imwrite(f"images/{id}(1).jpg", croppedFrame)
         else:
-            cv2.imwrite(f"{id  + "(2)"}.jpg", frame)   
+            cv2.imwrite(f"images/{id}(2).jpg", frame)
+
         return
+
+def togglePhoto():
+    global currently_showing_live_capture, last_detected_frame, second_detected_frame
+
+    if currently_showing_live_capture:
+        # Show detection image (last_detected_frame)
+        frame_to_show = last_detected_frame
+    else:
+        # Show live captured image (second_detected_frame)
+        frame_to_show = second_detected_frame
+
+    currently_showing_live_capture = not currently_showing_live_capture
+
+    if frame_to_show is not None:
+        img = cv2.cvtColor(frame_to_show, cv2.COLOR_BGR2RGBA)
+        image = Image.fromarray(img)
+        photo_image = ImageTk.PhotoImage(image=image)
+        result_label.configure(image=photo_image)
+        result_label.photo_image = photo_image
+
+
+def show_caputure_button():
+    start_preview()
+    toggle_button.pack_forget()
+    photo_button.pack_forget()
+    capture_button.pack(side=RIGHT)
+    photo_button.pack(side=RIGHT, padx = 15)
+
+def start_preview():
+    global live_preview_running
+    live_preview_running = True
+    update_preview_frame()
+
+def update_preview_frame():
+    global live_preview_running
+    if not live_preview_running:
+        return
+    
+    ret, frame = capture.read()
+    if not ret:
+        return
+    
+    preview_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
+    img = Image.fromarray(preview_image)
+    photo = ImageTk.PhotoImage(image=img)
+
+    result_label.configure(image=photo)
+    result_label.photo_image = photo
+
+    result_label.current_frame = frame.copy()
+
+    GUI.after(10, update_preview_frame)
+
+def takePhoto():
+    global second_detected_frame, live_preview_running, second_photo
+    live_preview_running = False
+
+    if hasattr(result_label, "current_frame"):
+        second_detected_frame = result_label.current_frame.copy()
+
+    
+    img = cv2.cvtColor(last_detected_frame, cv2.COLOR_BGR2RGBA)
+    image = Image.fromarray(img)
+    photo_image = ImageTk.PhotoImage(image=image)
+    result_label.configure(image=photo_image)
+    result_label.photo_image = photo_image
+
+    capture_button.pack_forget()
+    photo_button.pack_forget()
+    toggle_button.pack(side=RIGHT)
+
+    second_photo = True
+
 
 def submit():
     global label
     global color
     global description_entry
+    global location_entry
 
     description = description_entry.get()
     lab = item_entry.get()
     col = color_entry.get()
     loc = location_entry.get()
 
-    id = inputData(lab, col, description, loc)
+    id = inputData(lab, col, second_photo, description, loc)
 
-    takePhoto(last_detected_frame, boxes, id)
+    savePhoto(last_detected_frame, id, boxes)
+    savePhoto(second_detected_frame, id)
     return_to_main()
 
 def return_to_main():
-    global label
-    global color
+    global label, color, second_photo
 
     second_frame.pack_forget()
 
@@ -158,103 +246,118 @@ def return_to_main():
 
     label = []
     color = []
+    second_photo = False
     
     main_frame.pack(anchor="nw", padx=30, pady=50)
     update_frame()
 
 def show_second_screen():
+    # Clear any existing widgets in second_frame
     for widget in second_frame.winfo_children():
         widget.destroy()
     
-    global last_detected_frame
-    global description_entry
-    global item_entry
-    global location_entry
-    global color_entry
-
+    global last_detected_frame, description_entry, item_entry, location_entry, color_entry, result_label, capture_button, photo_button, toggle_button
 
     main_frame.pack_forget()
-    second_frame.pack(anchor="nw", padx=30, pady=50)
+    second_frame.pack(anchor="nw", fill=BOTH, expand=True, padx=30, pady=50)
 
-    # --- Left Frame ---
+    # === LEFT SIDE (Image with Back and Take Photo at bottom) ===
     left_frame2 = Frame(second_frame, bg="#1e1f1e")
-    left_frame2.pack(side = LEFT, padx=20, pady=20)
+    left_frame2.pack(side=LEFT, fill=BOTH, expand=True, padx=20, pady=20)
 
-    # --- Right Frame ---
-    right_frame2 = Frame(second_frame, bg="#1e1f1e")
-    right_frame2.pack(side = RIGHT, fill=Y, padx=20, pady=30)
-
-    # Convert the clean last frame to Tkinter-compatible image
-    image = Image.fromarray(cv2.cvtColor(last_detected_frame, cv2.COLOR_BGR2RGBA))
-    photo_image = ImageTk.PhotoImage(image=image)
-
-    result_label = Label(left_frame2, image=photo_image, bg="#1e1f1e", width=980, height=720)
+    # Top: Image display frame that expands
+    image_frame = Frame(left_frame2, bg="#1e1f1e")
+    image_frame.pack(side=TOP, fill=BOTH, expand=True)
+    try:
+        image = Image.fromarray(cv2.cvtColor(last_detected_frame, cv2.COLOR_BGR2RGBA))
+        photo_image = ImageTk.PhotoImage(image=image)
+    except Exception as e:
+        print("Error converting image:", e)
+        return
+    result_label = Label(image_frame, image=photo_image, bg="#1e1f1e", width=980, height=720)
     result_label.photo_image = photo_image  # Keep reference
-    result_label.pack(expand=True)
+    result_label.pack(fill=BOTH, expand=True)
 
-    # back button
-    back_button = Button(left_frame2, text="Back", command=return_to_main, font=("Helvetica", 14))
-    back_button.pack(pady=20)
+    # Bottom: Button frame for Back & Take Photo
+    left_button_frame = Frame(left_frame2, bg="#1e1f1e")
+    left_button_frame.pack(side=BOTTOM, fill=X, pady=10)
+    back_button = Button(left_button_frame, text="Back ⬅️", command=return_to_main, font=("Helvetica", 14))
+    back_button.pack(side = LEFT)
 
-    # detection results
-    detect_label = Label(
-    right_frame2,
-    text="Detection Results",
-    font=("Helvetica", 20, 'bold'),
-    justify=CENTER,
-    bg="#1E1F1E",
-    fg="white",
-    wraplength=300  # ← wrap at 300 pixels (adjust as needed)
-    )
-    detect_label.pack(anchor='n', side=TOP, fill=X, pady =25, padx= 20)
+    capture_button = Button(
+        left_button_frame,
+        text="📸 Capture",
+        command=takePhoto,
+        font=("Helvetica", 14),
+        padx=20)
 
-    directions_label = Label(
-    right_frame2,
-    text="The below input fields are autopopulated based on detection. Please correct any mistakes and/or enter a description of the item. Once finished, press the sumbit button.",
-    font=("Helvetica", 12, 'bold'),
-    justify=LEFT,
-    bg="#1E1F1E",
-    fg="white",
-    wraplength=350  # ← wrap at 300 pixels (adjust as needed)
-    )
-    directions_label.pack(anchor='n', side=TOP, fill=X, pady =25, padx= 20)
+    toggle_button = Button(
+        left_button_frame,
+        text="🔄 Toggle Photo",
+        command=togglePhoto,
+        font=("Helvetica", 14),
+        padx=20
+        )
+    toggle_button.pack(side=RIGHT)
 
-    item_label = Label(right_frame2, text="Item Type", fg="white", bg="#1e1f1e", font=("Helvetica", 12, 'bold'))
-    item_label.pack(pady=(10, 2), anchor='w', padx= 20 )
-    item_entry = Entry(right_frame2, width=45, font=("Helvetica", 12))
-    item_entry.pack(pady=(0,10), fill=X, padx= 20)
+    photo_button = Button(left_button_frame, text="Add Another Photo",
+                          command=show_caputure_button,
+                          font=("Helvetica", 14), padx=20)
+    photo_button.pack(padx = 15, side = RIGHT)
 
-    color_label = Label(right_frame2, text="Color", fg="white", bg="#1e1f1e", font=("Helvetica", 12, 'bold'))
-    color_label.pack(pady=(10, 2), anchor='w', padx= 20)
-    color_entry = Entry(right_frame2, width=45, font=("Helvetica", 12))
-    color_entry.pack(pady=(0,10), fill=X, padx=20)
+    # === RIGHT SIDE (Form with Submit button at bottom) ===
+    right_frame2 = Frame(second_frame, bg="#1e1f1e")
+    right_frame2.pack(side=RIGHT, fill=BOTH, expand=True, padx=20, pady=20)
 
-    location_label = Label(right_frame2, text="Location", fg="white", bg="#1e1f1e", font=("Helvetica", 12, 'bold'))
-    location_label.pack(pady=(10, 2), anchor='w', padx= 20)
-    location_entry = Entry(right_frame2, width=45, font=("Helvetica", 12))
-    location_entry.pack(pady=(0,10), fill=X, padx= 20)
+    # Top: Form frame that expands
+    form_frame = Frame(right_frame2, bg="#1e1f1e")
+    form_frame.pack(side=TOP, fill=BOTH, expand=True, padx=20, pady=20)
 
-    description_label = Label(right_frame2, text="Description (Brand, markings, case color, etc.)", fg="white", bg="#1e1f1e", font=("Helvetica", 12, 'bold'))
-    description_label.pack(pady=(10, 2), anchor='w', padx= 20)
-    description_entry = Entry(right_frame2, width=45, font=("Helvetica", 12))
-    description_entry.pack(pady=(0,10), fill=X, padx= 20)
+    # Detection Results Heading
+    detect_label = Label(form_frame, text="Detection Results", font=("Helvetica", 20, "bold"),
+                         bg="#1E1F1E", fg="white", wraplength=300)
+    detect_label.pack(anchor="n", fill=X, pady=10)
 
-    item_entry.insert(10, label[0])
-    color_entry.insert(10, color[0])
+    directions_label = Label(form_frame, text="The below input fields are autopopulated based on detection. "
+                           "Please correct any mistakes and/or enter a description of the item. Once finished, press the submit button.",
+                           font=("Helvetica", 12, "bold"), bg="#1E1F1E", fg="white", wraplength=350)
+    directions_label.pack(anchor="n", fill=X, pady=10)
+
+    # Input fields
+    item_label = Label(form_frame, text="Item Type", fg="white", bg="#1e1f1e", font=("Helvetica", 12, "bold"))
+    item_label.pack(pady=(10, 2), anchor="w")
+    item_entry = Entry(form_frame, width=45, font=("Helvetica", 12))
+    item_entry.pack(pady=(0,10), fill=X)
+
+    color_label = Label(form_frame, text="Color", fg="white", bg="#1e1f1e", font=("Helvetica", 12, "bold"))
+    color_label.pack(pady=(10, 2), anchor="w")
+    color_entry = Entry(form_frame, width=45, font=("Helvetica", 12))
+    color_entry.pack(pady=(0,10), fill=X)
+
+    location_label = Label(form_frame, text="Location", fg="white", bg="#1e1f1e", font=("Helvetica", 12, "bold"))
+    location_label.pack(pady=(10, 2), anchor="w")
+    location_entry = Entry(form_frame, width=45, font=("Helvetica", 12))
+    location_entry.pack(pady=(0,10), fill=X)
+
+    description_label = Label(form_frame, text="Description (Brand, markings, case color, etc.)",
+                              fg="white", bg="#1e1f1e", font=("Helvetica", 12, "bold"))
+    description_label.pack(pady=(10, 2), anchor="w")
+    description_entry = Entry(form_frame, width=45, font=("Helvetica", 12))
+    description_entry.pack(pady=(0,10), fill=X)
+
+    # Prepopulate entries if desired
+    if label:
+        item_entry.insert(10, label[0])
+    if color:
+        color_entry.insert(10, color[0])
     location_entry.insert(10, "Tolliver")
 
-
-    submit_button = Button(right_frame2,
-        text="Submit",
-        command=submit,
-        font=("Helvetica", 12),
-        bg="#4CAF50",
-        fg="white",
-        padx=20,
-        pady=10)
-    submit_button.pack(pady= 20)
-
-    
+    # Bottom: Submit button frame (anchored at bottom)
+    right_button_frame = Frame(right_frame2, bg="#1e1f1e")
+    right_button_frame.pack(side=BOTTOM, fill=X, pady=10)
+    submit_button = Button(right_button_frame, text="Submit ➡️", command=submit,
+                           font=("Helvetica", 14), bg="#4CAF50", fg="white", padx=15)
+    submit_button.pack()
 
 # --- Frame Updater ---
 def update_frame():
