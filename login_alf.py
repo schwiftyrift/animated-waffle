@@ -4,16 +4,103 @@ from tkinter import Entry
 from tkinter import Button
 from tkinter import messagebox
 from PIL import ImageTk, Image
+import json
 
 def handle_login():
     email = email_input.get()   # storing the email given from user
     password = password_input.get()  # storing the password given from user
-    print(email, password)
 
-    if email == 'rkg007@latech.edu' and password == '12345':
-        messagebox.showinfo('Yayyy', 'Login Successful')
+    if not email or not password:
+        messagebox.showerror("Error", "Both email and password are required")
+        return
+    
+    if not email.endswith("@latech.edu"):
+        messagebox.showerror("Error", "Your email must be a @latech.edu address")
+        return
+    
+    try: 
+        with open("users.json", "r") as f:
+            users = json.load(f)
+    except FileNotFoundError:
+        users = {}
+
+    if email in users and users[email]["passKey"] == password:
+        messagebox.showinfo("Yayyy", f"Login Successfull! Welcome {users[email]['name']}!")
     else:
-        messagebox.showerror('Error','Login Failed')
+        messagebox.showerror("Error", "Invalid email or password")
+
+
+# creating account button and new window GUI
+def openCreateAccountWindow():
+    createWindow = tk.Toplevel(root)
+    createWindow.title("Create an Account")
+    createWindow.geometry("350x500")
+    createWindow.configure(background = '#0096DC')
+    
+    # StudentId (CWID)
+    cwidLabel = Label(createWindow, text='Enter CWID', fg = 'white', bg = '#0096DC', font=('helvetica', 10))
+    cwidLabel.pack(pady=(20,5))
+    cwidInput = Entry(createWindow, width = 50)
+    cwidInput.pack(ipady = 6, pady = (1,10))
+    
+    # For Name
+    nameLabel = Label(createWindow, text = "Enter Your Full Name", fg = 'white', bg = '#0096DC', font = ('helvetica', 10))
+    nameLabel.pack(pady = (10,5))
+    nameInput = Entry(createWindow, width = 50)
+    nameInput.pack(ipady = 6, pady = (1,10))
+
+    # for Email
+    emailLabel = Label(createWindow, text='Enter Your Email Address (@latech.edu)', fg = 'white', bg = '#0096DC', font=('helvetica', 10))
+    emailLabel.pack(pady=(10,5))
+    emailInputNew = Entry(createWindow, width = 50)
+    emailInputNew.pack(ipady = 6, pady = (1,10))
+
+
+    # for passkey
+    passKeyLabel = Label(createWindow, text='Enter Pass Key', fg = 'white', bg = '#0096DC', font=('helvetica', 10))
+    passKeyLabel.pack(pady=(10,5))
+    passKeyInputNew = Entry(createWindow, width = 50)
+    passKeyInputNew.pack(ipady = 6, pady = (1,10))
+
+    # save button
+    def saveAccount():
+        cwid = cwidInput.get()
+        name = nameInput.get()
+        email = emailInputNew.get()
+        passKey = passKeyInputNew.get()
+
+        if not (cwid and name and email and passKey):
+            messagebox.showerror("Error", "All fields are mandatory")
+            return
+        if not email.endswith("@latech.edu"):
+            messagebox.showerror("Error", "Your email must be a @latech.edu address")
+            return
+        
+        # saving it to the JSON file
+        try:
+            with open("users.json", "r") as f:
+                users = json.load(f)
+        except FileNotFoundError:
+            users = {}
+
+        if email in users:
+            messagebox.showerror("Error", "The account already exists with this email")
+        else:
+            users[email] = {
+                "cwid": cwid,
+                "name": name,
+                "passKey": passKey
+            }
+
+            with open("users.json", "w") as f:
+                json.dump(users, f, indent = 4)
+            messagebox.showinfo("Yayyy", "The account is created successfully")
+            createWindow.destroy()
+
+
+    createBtn = Button(createWindow, text = "Create an Account", bg = 'white', fg = 'black', width = 20, height = 2, command = saveAccount)
+    createBtn.pack(pady=10)
+
 
 
 # creating main window
@@ -78,8 +165,15 @@ password_input.pack(ipady = 6, pady = (1,15))
 login_btn = Button(root, text = 'Login Here Bulldog', bg = 'white', fg = 'black', width = 20,height=2, command = handle_login)  # command is callilng the function handle_login
 login_btn.pack(pady=(10,20))
 
+#adding more buttons
+createAccountBtn = Button(root, text = "Create an Account", bg = 'white', fg = 'black', width = 20, height = 2, command=openCreateAccountWindow)
+createAccountBtn.pack(pady = (0,20))
+createAccountBtn.config(font=('helvetica', 10))
+
+
 # designing the font
 login_btn.config(font=('helvetica', 10))
+
 
 # let's run the application
 root.mainloop()
