@@ -1,0 +1,12 @@
+{
+    "abc007@latech.edu": {
+        "cwid": "123456789",
+        "name": "Rakesh Kumar ",
+        "passKey": "789456"
+    },
+    "xyz@latech.edu": {
+        "cwid": "222222",
+        "name": "Raja K",
+        "passKey": "qwer1234"
+    }
+}
