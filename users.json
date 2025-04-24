@@ -8,5 +8,10 @@
         "cwid": "222222",
         "name": "Raja K",
         "passKey": "qwer1234"
+    },
+    "qwe@latech.edu": {
+        "cwid": "11111",
+        "name": "Rocky",
+        "passKey": "456123"
     }
 }
