@@ -5,6 +5,7 @@ import logging
 from PIL import Image, ImageTk
 from Database import *
 import os
+from datetime import datetime
 
 img_directory = "images"
 os.makedirs(img_directory, exist_ok=True)
@@ -127,6 +128,9 @@ instructions = Label(
 )
 instructions.pack(anchor='n', side=TOP, fill=X)
 
+def get_current_date():
+    return datetime.now().strftime("%b %d, %Y").replace(" 0", " ")
+
 def savePhoto(frame, id, boxes = None):
         croppedFrame = None
         if boxes != None:
@@ -219,12 +223,14 @@ def submit():
     global description_entry
     global location_entry
 
+    date = get_current_date()
+
     description = description_entry.get()
     lab = item_entry.get()
     col = color_entry.get()
     loc = location_entry.get()
 
-    id = inputData(lab, col, second_photo, description, loc)
+    id = inputData(lab, col, second_photo, date, description, loc)
 
     savePhoto(last_detected_frame, id, boxes)
     savePhoto(second_detected_frame, id)
