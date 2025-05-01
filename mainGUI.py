@@ -1,426 +1,210 @@
 from tkinter import *
-import cv2
-from detector import Detector
-import logging
-from PIL import Image, ImageTk
-from Database import *
+import tkinter as tk
+from tkinter import ttk
+from tkinter import messagebox
+from kioskGUI import run_kiosk_gui
+from searchGUI import run_user_gui
+from UserData import login
+import sys
+import json
 import os
-from datetime import datetime
 
-img_directory = "images"
-os.makedirs(img_directory, exist_ok=True)
-
-# Create GUI instance
-GUI = Tk()
-GUI.title("Lost and Found Detection") 
-
-# Set window size (optional)
-GUI.attributes("-fullscreen", True)
-
-GUI.configure(bg="#1e1f1e")
-
-GUI.bind('<Escape>', lambda e: GUI.quit())
-
-# Suppress YOLOv8 output to terminal
-logging.getLogger("ultralytics").setLevel(logging.CRITICAL)
-
-# Initializes the detector
-detector = Detector(model_path="best.pt")
-
-# Open webcam
-capture = cv2.VideoCapture(0)
-capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)  # Set high resolution
-capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-if not capture.isOpened():
-    print("Error: Could not open webcam.")
-    exit()
-
-#Text entry box
-description_entry = None
-item_entry = None
-location_entry = None
-color_entry = None
-result_label = None
-
-# buttons
-capture_button = None
-photo_button = None
-toggle_button = None
-
-# Trackers
-label = []
-color = []
-description = ""
-boxes = []
-pressed = False
-last_detected_frame = None
-second_detected_frame = None
-continue_updating = True
-live_preview_running = False
-currently_showing_live_capture = True
-second_photo = False
-
-# --- Layout Frame ---
-main_frame = Frame(GUI, bg="#1e1f1e")
-main_frame.pack(anchor="nw", padx=30, pady=50)
-
-# --- Second Frame ---
-second_frame = Frame(GUI, bg="#1e1f1e")
-
-# --- Left Frame ---
-left_frame = Frame(main_frame, bg="#1e1f1e")
-left_frame.pack(side = LEFT, padx=20, pady=20)
-
-# --- Right Frame ---
-right_frame = Frame(main_frame, bg="#1e1f1e")
-right_frame.pack(side = RIGHT, fill=Y, padx=20, pady=2)
-
-# --- Camera Preview ---
-camera_widget = Label(left_frame, bg="#1e1f1e", width=980, height=720)
-camera_widget.pack(expand=True)
-
-# --- Detect Button ---
-def change_Press(value):
-    global pressed
-    pressed = value
-
-detect_button = Button(
-    left_frame,
-    text="Start Detection",
-    command=lambda: change_Press(True),
-    font=("Helvetica", 16),
-    bg="#4CAF50",
-    fg="white",
-    padx=20,
-    pady=10
-)
-detect_button.pack(pady= 20)
-
-title = Label(
-    right_frame,
-    text = "Automated Lost and Found System",
-    font=("Helvtica", 19, 'bold'),
-    justify = CENTER,
-    bg="#1E1F1E",
-    fg="white"
-)
-title.pack(anchor='n', side=TOP, fill=X, pady =25)
-
-instructions_title = Label(
-    right_frame,
-    text="🔍 How to Use:",
-    font=("Helvetica", 14, 'bold'),
-    justify=LEFT,
-    bg="#1E1F1E",
-    fg="white",
-    wraplength=300  # ← wrap at 300 pixels (adjust as needed)
-)
-instructions_title.pack(anchor='n', side=TOP, fill=X, pady = 20)
-
-instructions = Label(
-    right_frame,
-    text="1. Position object in front of the camera.\n\n\n2. Click 'Start Detection'.\n\n\n3. Review detection on next screen\n\n\n🎯 Tip: Make sure the object is well-lit and centered.",
-    font=("Helvetica", 14),
-    justify=LEFT,
-    bg="#1E1F1E",
-    fg="white",
-    wraplength=300  # ← wrap at 300 pixels (adjust as needed)
-)
-instructions.pack(anchor='n', side=TOP, fill=X)
-
-def get_current_date():
-    return datetime.now().strftime("%b %d, %Y").replace(" 0", " ")
-
-def savePhoto(frame, id, boxes = None):
-        croppedFrame = None
-        if boxes != None:
-            for box in boxes:
-                if len(box) == 4:  # Ensure valid bounding box
-                    x1, y1, x2, y2 = box
-                    croppedFrame = frame[y1:y2, x1:x2]
-                    cv2.imwrite(f"images/{id}(1).jpg", croppedFrame)
-        else:
-            cv2.imwrite(f"images/{id}(2).jpg", frame)
-
-        return
-
-def togglePhoto():
-    global currently_showing_live_capture, last_detected_frame, second_detected_frame
-
-    if currently_showing_live_capture:
-        # Show detection image (last_detected_frame)
-        frame_to_show = last_detected_frame
+def launch_gui():
+    if len(sys.argv) > 1:
+        user = sys.argv[1]
     else:
-        # Show live captured image (second_detected_frame)
-        frame_to_show = second_detected_frame
+        user = "default_user"
 
-    currently_showing_live_capture = not currently_showing_live_capture
+    logged_in = False
 
-    if frame_to_show is not None:
-        img = cv2.cvtColor(frame_to_show, cv2.COLOR_BGR2RGBA)
-        image = Image.fromarray(img)
-        photo_image = ImageTk.PhotoImage(image=image)
-        result_label.configure(image=photo_image)
-        result_label.photo_image = photo_image
+    root = Tk()
+    root.title("Lost and Found System")
+    root.attributes("-fullscreen", True)
+    root.configure(bg="#1e1f1e")
+    root.bind('<Escape>', lambda e: root.quit())
+
+    style = ttk.Style()
+    style.theme_use('default')
+    style.configure("TNotebook", background="#1e1f1e", borderwidth=2)
+    style.configure("TNotebook.Tab",
+                    background="#333333",
+                    foreground="white",
+                    padding=[20, 15],
+                    font=('Arial', 14))
+    style.map("TNotebook.Tab",
+              background=[("selected", "#555555"), ("!selected", "#333333")],
+              foreground=[("selected", "white"), ("!selected", "gray")])
+
+    # Top bar frame
+    top_bar = Frame(root, bg="#1e1f1e")
+    top_bar.pack(side=TOP, fill=X)
 
 
-def show_caputure_button():
-    start_preview()
-    toggle_button.pack_forget()
-    photo_button.pack_forget()
-    capture_button.pack(side=RIGHT)
-    photo_button.pack(side=RIGHT, padx = 15)
 
-def start_preview():
-    global live_preview_running
-    live_preview_running = True
-    update_preview_frame()
 
-def update_preview_frame():
-    global live_preview_running
-    if not live_preview_running:
-        return
+
+    '''
+    login_button = Button(top_bar, text="Login for Item Search", command=lambda: open_login_window(), bg='white', font=("Helvetica", 12))
+    login_button.pack(side=RIGHT, padx=20, pady=5)
+    '''
+
+    logout_button = Button(top_bar, text="Logout", command=lambda: logout(), bg='white', font=("Arial", 12))
     
-    ret, frame = capture.read()
-    if not ret:
-        return
-    
-    preview_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
-    img = Image.fromarray(preview_image)
-    photo = ImageTk.PhotoImage(image=img)
+    def on_tab_changed(event):
+        selected_tab = event.widget.index("current")
+        if selected_tab == 1:  # Item Search tab index
+            if logged_in == False:
+                # Prevent switching to the tab
+                notebook.tab(1, state="disabled")
+                notebook.select(0)
+                open_login_window()
 
-    result_label.configure(image=photo)
-    result_label.photo_image = photo
+    # Notebook underneath
+    notebook = ttk.Notebook(root)
+    notebook.pack(fill=BOTH, expand=True)
+    notebook.bind("<<NotebookTabChanged>>", on_tab_changed)
+    kiosk_frame = Frame(notebook, bg="#1e1f1e")
+    user_gui_frame = Frame(notebook, bg="#1e1f1e")
 
-    result_label.current_frame = frame.copy()
+    notebook.add(kiosk_frame, text="Item Detection")
+    notebook.add(user_gui_frame, text="Item Search")
 
-    GUI.after(10, update_preview_frame)
+    # Disable Item Search tab initially
+    #notebook.tab(1, state='disabled')
 
-def takePhoto():
-    global second_detected_frame, live_preview_running, second_photo
-    live_preview_running = False
+    run_kiosk_gui(kiosk_frame)
 
-    if hasattr(result_label, "current_frame"):
-        second_detected_frame = result_label.current_frame.copy()
+    def logout():
+            nonlocal logged_in
+            notebook.select(0)
+            logout_button.pack_forget()
+            logged_in = False
 
-    
-    img = cv2.cvtColor(last_detected_frame, cv2.COLOR_BGR2RGBA)
-    image = Image.fromarray(img)
-    photo_image = ImageTk.PhotoImage(image=image)
-    result_label.configure(image=photo_image)
-    result_label.photo_image = photo_image
+            for widget in user_gui_frame.winfo_children():
+                widget.destroy()
+            user_gui_frame.pack_forget()
 
-    capture_button.pack_forget()
-    photo_button.pack_forget()
-    toggle_button.pack(side=RIGHT)
+            messagebox.showinfo("Logged Out", "You have been logged out.")
 
-    second_photo = True
+    def open_login_window():
+
+        def open_create_account_window():
+            create_win = Toplevel(login_win)
+            create_win.title("Create an Account")
+            create_win.geometry("400x400")
+            create_win.configure(bg="#333333")
+            create_win.grab_set()
+
+            Label(create_win, text="CWID", bg="#333333", fg="white", font=("Arial", 12)).pack(pady=10)
+            cwid_entry_new = Entry(create_win, font=("Arial", 12))
+            cwid_entry_new.pack(pady=5)
+
+            Label(create_win, text="Full Name", bg="#333333", fg="white", font=("Arial", 12)).pack(pady=10)
+            name_entry = Entry(create_win, font=("Arial", 12))
+            name_entry.pack(pady=5)
+
+            Label(create_win, text="Password", bg="#333333", fg="white", font=("Arial", 12)).pack(pady=10)
+            pass_entry_new = Entry(create_win, font=("Arial", 12))
+            pass_entry_new.pack(pady=5)
+
+            def save_account():
+                cwid = cwid_entry_new.get()
+                name = name_entry.get()
+                password = pass_entry_new.get()
+
+                if not (cwid and name and password):
+                    messagebox.showerror("Error", "All fields are mandatory", parent=create_win)
+                    return
+
+                if len(cwid) != 8 or not cwid.isdigit():
+                    messagebox.showerror("Error", "CWID must be 8 digits", parent=create_win)
+                    return
+
+                from UserData import register_user  # import here to avoid circular imports if necessary
+                success = register_user(cwid, password, name)
+                if not success:
+                    messagebox.showerror("Error", "An account already exists with this CWID", parent=create_win)
+                else:
+                    messagebox.showinfo("Success", "Account created successfully", parent=create_win)
+                    create_win.destroy()
+
+            Button(create_win, text="Create Account", command=save_account, bg="white", font=("Arial", 12)).pack(pady=20)
+
+        def save_credentials(username, password, remember_me):
+            if remember_me:
+                data = {
+                    "username": username,
+                    "password": password,
+                    "remember_me": True
+                }
+                with open("credentials.json", "w") as f:
+                    json.dump(data, f)
+            else:
+                if os.path.exists("credentials.json"):
+                    os.remove("credentials.json")  # Remove the file if "Remember Me" is unchecked
+                # Clear the entries
+                cwid_entry.delete(0, tk.END)
+                pass_entry.delete(0, tk.END)
+                checkValue.set(0)  # Uncheck the checkbox
+
+        def load_credentials():
+            try:
+                with open("credentials.json", "r") as f:
+                    data = json.load(f)
+                    if data.get("remember_me"):
+                        return data["username"], data["password"]
+            except (FileNotFoundError, json.JSONDecodeError):
+                pass
+            return "", ""  # Return empty if not remembered
+
+        login_win = Toplevel(root)
+        login_win.title("Login for Item Search")
+        login_win.geometry("400x300")
+        login_win.configure(bg="#333333")
+        login_win.grab_set()
+
+        storedUser, storedPass = load_credentials()
+        Label(login_win, text="CWID", bg="#333333", fg="white", font=("Arial", 12)).pack(pady=10)
+        cwid_entry = Entry(login_win, font=("Arial", 12))
+        cwid_entry.insert(0, storedUser)
+        cwid_entry.pack(pady=5)
+
+        Label(login_win, text="Password", bg="#333333", fg="white", font=("Arial", 12)).pack(pady=10)
+        pass_entry = Entry(login_win, show="*", font=("Arial", 12))
+        pass_entry.insert(0, storedPass)
+        pass_entry.pack(pady=5)
+
+        checkValue = tk.IntVar()
+        rememberLogin = tk.Checkbutton(login_win, text = "Remember Me", variable = checkValue)
+        rememberLogin.configure(bg="#333333", fg="white", activebackground="#333333", selectcolor="#333333")
+        rememberLogin.pack()
+
+        if storedUser and storedPass:
+            checkValue.set(1)
+
+        def attempt_login():
+            nonlocal logged_in
+            cwid = cwid_entry.get()
+            password = pass_entry.get()
+            success = login(cwid, password)
+            if success:
+                messagebox.showinfo("Login", "Login Successful!")
+                run_user_gui(user_gui_frame, cwid)
+                save_credentials(cwid, password, checkValue.get())
+                notebook.tab(1, state='normal')
+                notebook.select(1)
+                login_win.destroy()
+                logged_in = True
+                logout_button.pack(side=RIGHT, padx=20, pady=5)  # Show logout
+            else:
+                messagebox.showerror("Error", "Invalid CWID or password")
+                pass_entry.delete(0, tk.END)
+                pass_entry.focus_set()
+
+        Button(login_win, text="Login", command=attempt_login, bg="white", font=("Arial", 12)).pack(pady=20)
+        Button(login_win, text="Create Account", command=open_create_account_window, bg="white", font=("Arial", 12)).pack(pady=5)
+    root.mainloop()
 
 
-def submit():
-    global label
-    global color
-    global description_entry
-    global location_entry
-
-    date = get_current_date()
-
-    description = description_entry.get()
-    lab = item_entry.get()
-    col = color_entry.get()
-    loc = location_entry.get()
-
-    id = inputData(lab, col, second_photo, date, description, loc)
-
-    savePhoto(last_detected_frame, id, boxes)
-    savePhoto(second_detected_frame, id)
-    return_to_main()
-
-def return_to_main():
-    global label, color, second_photo
-
-    second_frame.pack_forget()
-
-    # Clear second_frame to avoid clutter next time
-    for widget in second_frame.winfo_children():
-        widget.destroy()
-
-    # Reset flags, etc. if needed
-    global pressed, continue_updating
-    pressed = False
-    continue_updating = True
-
-    label = []
-    color = []
-    second_photo = False
-    
-    main_frame.pack(anchor="nw", padx=30, pady=50)
-    update_frame()
-
-def show_second_screen():
-    # Clear any existing widgets in second_frame
-    for widget in second_frame.winfo_children():
-        widget.destroy()
-    
-    global last_detected_frame, description_entry, item_entry, location_entry, color_entry, result_label, capture_button, photo_button, toggle_button
-
-    main_frame.pack_forget()
-    second_frame.pack(anchor="nw", fill=BOTH, expand=True, padx=30, pady=50)
-
-    # === LEFT SIDE (Image with Back and Take Photo at bottom) ===
-    left_frame2 = Frame(second_frame, bg="#1e1f1e")
-    left_frame2.pack(side=LEFT, fill=BOTH, expand=True, padx=20, pady=20)
-
-    # Top: Image display frame that expands
-    image_frame = Frame(left_frame2, bg="#1e1f1e")
-    image_frame.pack(side=TOP, fill=BOTH, expand=True)
-    try:
-        image = Image.fromarray(cv2.cvtColor(last_detected_frame, cv2.COLOR_BGR2RGBA))
-        photo_image = ImageTk.PhotoImage(image=image)
-    except Exception as e:
-        print("Error converting image:", e)
-        return
-    result_label = Label(image_frame, image=photo_image, bg="#1e1f1e", width=980, height=720)
-    result_label.photo_image = photo_image  # Keep reference
-    result_label.pack(fill=BOTH, expand=True)
-
-    # Bottom: Button frame for Back & Take Photo
-    left_button_frame = Frame(left_frame2, bg="#1e1f1e")
-    left_button_frame.pack(side=BOTTOM, fill=X, pady=10)
-    back_button = Button(left_button_frame, text="Back ⬅️", command=return_to_main, font=("Helvetica", 14))
-    back_button.pack(side = LEFT)
-
-    capture_button = Button(
-        left_button_frame,
-        text="📸 Capture",
-        command=takePhoto,
-        font=("Helvetica", 14),
-        padx=20)
-
-    toggle_button = Button(
-        left_button_frame,
-        text="🔄 Toggle Photo",
-        command=togglePhoto,
-        font=("Helvetica", 14),
-        padx=20
-        )
-    toggle_button.pack(side=RIGHT)
-
-    photo_button = Button(left_button_frame, text="Add Another Photo",
-                          command=show_caputure_button,
-                          font=("Helvetica", 14), padx=20)
-    photo_button.pack(padx = 15, side = RIGHT)
-
-    # === RIGHT SIDE (Form with Submit button at bottom) ===
-    right_frame2 = Frame(second_frame, bg="#1e1f1e")
-    right_frame2.pack(side=RIGHT, fill=BOTH, expand=True, padx=20, pady=20)
-
-    # Top: Form frame that expands
-    form_frame = Frame(right_frame2, bg="#1e1f1e")
-    form_frame.pack(side=TOP, fill=BOTH, expand=True, padx=20, pady=20)
-
-    # Detection Results Heading
-    detect_label = Label(form_frame, text="Detection Results", font=("Helvetica", 20, "bold"),
-                         bg="#1E1F1E", fg="white", wraplength=300)
-    detect_label.pack(anchor="n", fill=X, pady=10)
-
-    directions_label = Label(form_frame, text="The below input fields are autopopulated based on detection. "
-                           "Please correct any mistakes and/or enter a description of the item. Once finished, press the submit button.",
-                           font=("Helvetica", 12, "bold"), bg="#1E1F1E", fg="white", wraplength=350)
-    directions_label.pack(anchor="n", fill=X, pady=10)
-
-    # Input fields
-    item_label = Label(form_frame, text="Item Type", fg="white", bg="#1e1f1e", font=("Helvetica", 12, "bold"))
-    item_label.pack(pady=(10, 2), anchor="w")
-    item_entry = Entry(form_frame, width=45, font=("Helvetica", 12))
-    item_entry.pack(pady=(0,10), fill=X)
-
-    color_label = Label(form_frame, text="Color", fg="white", bg="#1e1f1e", font=("Helvetica", 12, "bold"))
-    color_label.pack(pady=(10, 2), anchor="w")
-    color_entry = Entry(form_frame, width=45, font=("Helvetica", 12))
-    color_entry.pack(pady=(0,10), fill=X)
-
-    location_label = Label(form_frame, text="Location", fg="white", bg="#1e1f1e", font=("Helvetica", 12, "bold"))
-    location_label.pack(pady=(10, 2), anchor="w")
-    location_entry = Entry(form_frame, width=45, font=("Helvetica", 12))
-    location_entry.pack(pady=(0,10), fill=X)
-
-    description_label = Label(form_frame, text="Description (Brand, markings, case color, etc.)",
-                              fg="white", bg="#1e1f1e", font=("Helvetica", 12, "bold"))
-    description_label.pack(pady=(10, 2), anchor="w")
-    description_entry = Entry(form_frame, width=45, font=("Helvetica", 12))
-    description_entry.pack(pady=(0,10), fill=X)
-
-    # Prepopulate entries if desired
-    if label:
-        item_entry.insert(10, label[0])
-    if color:
-        color_entry.insert(10, color[0])
-    location_entry.insert(10, "Tolliver")
-
-    # Bottom: Submit button frame (anchored at bottom)
-    right_button_frame = Frame(right_frame2, bg="#1e1f1e")
-    right_button_frame.pack(side=BOTTOM, fill=X, pady=10)
-    submit_button = Button(right_button_frame, text="Submit ➡️", command=submit,
-                           font=("Helvetica", 14), bg="#4CAF50", fg="white", padx=15)
-    submit_button.pack()
-
-# --- Frame Updater ---
-def update_frame():
-    global pressed, label, color, last_detected_frame, continue_updating
-
-    if not continue_updating:
-        return
-
-    ret, frame = capture.read()
-    if not ret:
-        print("Failed to grab frame.")
-        GUI.after(10, update_frame)
-        return
-    
-    cleanFrame = frame.copy()
-    
-    if pressed:
-        global boxes
-        frame_with_boxes, labels, boxes = detector.detectObject(frame)
-        last_detected_frame = cleanFrame.copy()  # clean version for later
-
-        if labels:
-            for lbl in labels:
-                if len(label) < 20:
-                    label.append(lbl)
-            print("Detected Object:", label)
-
-        if boxes:
-            colors = detector.detectColor(frame, boxes)
-            for col in colors:
-                if len(color) < 20:
-                    color.append(col)
-            print("Detected Colors:", color)
-
-        # Show the image with boxes *right now*
-        opencv_image = cv2.cvtColor(frame_with_boxes, cv2.COLOR_BGR2RGBA)
-        captured_image = Image.fromarray(opencv_image)
-        photo_image = ImageTk.PhotoImage(image=captured_image)
-        camera_widget.photo_image = photo_image
-        camera_widget.configure(image=photo_image)
-
-        # Schedule transition *after* preview is shown
-        continue_updating = False
-        GUI.after(2000, show_second_screen)
-        return
-
-    # Convert OpenCV frame to Tkinter image
-    opencv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
-    captured_image = Image.fromarray(opencv_image)
-    photo_image = ImageTk.PhotoImage(image=captured_image)
-
-    camera_widget.photo_image = photo_image
-    camera_widget.configure(image=photo_image)
-
-    GUI.after(10, update_frame)
-
-# Start updating frames
-
-GUI.after(0, update_frame)
-GUI.mainloop()
+if __name__ == '__main__':
+    launch_gui()
