@@ -16,7 +16,7 @@ def save_user_data(user_data):
         json.dump(user_data, file, indent=4)
 
 # 1. User Registration: Prompt user to create a username and password
-def register_user(username, password, cwid, name):
+def register_user(username, password, name):
     user_data = load_user_data()
 
     if username in user_data:
@@ -25,7 +25,6 @@ def register_user(username, password, cwid, name):
 
     user_data[username] = {
         "password": password,
-        "cwid": cwid,
         "name": name
     }
 
@@ -78,6 +77,14 @@ def check_old_password(username, old_password):
     if username in user_data and user_data[username]["password"] == old_password:
         return True
     return False
+
+def isUser(username):
+    user_data = load_user_data()
+
+    if username not in user_data:
+        return False
+
+    return True
     
 
 

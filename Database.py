@@ -1,15 +1,11 @@
 import json
 import os
 from random import randint
-<<<<<<< HEAD
-
-=======
 import difflib
 import spacy
 nlp = spacy.load("en_core_web_md")
 
 # Base class
->>>>>>> development
 class Item:
     def __init__(self, label, color, secondImage, date, description = "No description provided", location = ""):
         self.id = self.generate_id()

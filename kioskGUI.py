@@ -1,5 +1,3 @@
-# mainGUI.py — restored kiosk detection GUI
-
 from tkinter import *
 from PIL import Image, ImageTk
 from detector import Detector
@@ -112,7 +110,7 @@ def run_kiosk_gui(parent):
 
     instructions = Label(
         right_frame,
-        text="1. Position object in front of the camera.\n\n\n2. Click 'Start Detection'.\n\n\n3. Review detection on next screen\n\n\n🎯 Tip: Make sure the object is well-lit and centered.\n\n\n\n Click the login button in the top left corner to search for lost items",
+        text="1. Position object in front of the camera.\n\n\n2. Click 'Start Detection'.\n\n\n3. Review detection on next screen\n\n\n🎯 Tip: Make sure the object is well-lit and centered.\n\n\n\n Click the Item Search tab in the top left corner to search for lost items",
         font=("Helvetica", 14),
         justify=LEFT,
         bg="#1E1F1E",

@@ -183,10 +183,12 @@ def launch_gui():
             checkValue.set(1)
 
         def attempt_login():
+            from UserData import isUser
             nonlocal logged_in
             cwid = cwid_entry.get()
             password = pass_entry.get()
             success = login(cwid, password)
+            isCurrentUser = isUser(cwid)
             if success:
                 messagebox.showinfo("Login", "Login Successful!")
                 run_user_gui(user_gui_frame, cwid)
@@ -196,6 +198,10 @@ def launch_gui():
                 login_win.destroy()
                 logged_in = True
                 logout_button.pack(side=RIGHT, padx=20, pady=5)  # Show logout
+            elif(not isCurrentUser):
+                messagebox.showerror("Error", "CWID is not registered, please create an account")
+                pass_entry.delete(0, tk.END)
+                pass_entry.focus_set()
             else:
                 messagebox.showerror("Error", "Invalid CWID or password")
                 pass_entry.delete(0, tk.END)
