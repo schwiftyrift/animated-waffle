@@ -1,15 +1,29 @@
 import json
 import os
 from random import randint
+<<<<<<< HEAD
 
+=======
+import difflib
+import spacy
+nlp = spacy.load("en_core_web_md")
+
+# Base class
+>>>>>>> development
 class Item:
-    def __init__(self, label, color, description = "No description provided", location = ""):
+    def __init__(self, label, color, secondImage, date, description = "No description provided", location = ""):
         self.id = self.generate_id()
+        self.date = date
         self.label = label
         self.color = color
         self.description = description
         self.location = location
-        self.image = f"{self.id + "(1)"}.jpg"
+        self.image = f"images/{self.id}(1).jpg"
+        if secondImage:
+            self.secondImage = f"images/{self.id}(2).jpg"
+        else:
+            self.secondImage = "None"
+
 
     @property
     def id(self):
@@ -27,20 +41,23 @@ class Item:
             "id": self.id,
             "label": self.label,
             "color": self.color,
+            "date": self.date,
             "description": self.description,
             "image": self.image,
-            "location": self.location
+            "secondImage": self.secondImage,
+            "location": self.location,
+            "status": "available"
 
         }
     
 
 # Subclasses
-class WaterBottle(Item): pass
+class Bottle(Item): pass
 class CellPhone(Item): pass
 class Wallet(Item): pass
 class Keys(Item): pass
 class Laptop(Item): pass
-class Glasses(Item): pass
+class Sunglasses(Item): pass
 class Headphones(Item): pass
 class Calculator(Item): pass
 class Watch(Item): pass
@@ -50,12 +67,12 @@ class Handbag(Item): pass
 
 # Mapping
 item_classes = {
-    "water bottle": WaterBottle,
+    "bottle": Bottle,
     "cell phone": CellPhone,
     "wallet": Wallet,
     "keys": Keys,
     "laptop": Laptop,
-    "glasses": Glasses,
+    "sunglasses": Sunglasses,
     "headphones": Headphones,
     "calculator": Calculator,
     "watch": Watch,
@@ -79,13 +96,13 @@ def save_item_history(history):
         json.dump(history, file, indent=4)
 
 # Main function
-def inputData(label, color, description, location):
+def inputData(label, color, secondImage, date, description, location):
     label = label.lower()
     if label not in item_classes:
         raise ValueError(f"Unknown item label: {label}")
 
     item_class = item_classes[label]
-    item_instance = item_class(label, color, description, location)
+    item_instance = item_class(label, color, secondImage, date, description, location)
 
     itemID = item_instance.id
 
@@ -95,5 +112,82 @@ def inputData(label, color, description, location):
     save_item_history(item_history)
     return itemID
 
+def checkout_item(item_id):
+    item_history = load_item_history()
+    updated = False
 
+    for item in item_history:
+        if item["id"] == item_id and item["status"] == "available":
+            item["status"] = "checked-out"
+            updated = True
+            break
 
+    if updated:
+        save_item_history(item_history)
+        return True
+    else:
+        return False  # item not found or already checked out
+
+def lookup_item_by_id(item_id):
+    item_history = load_item_history()
+    for item in item_history:
+        if item["id"] == item_id:
+            return item
+    return None
+
+def get_closest_label_spacy(query, labels, threshold=0.75):
+    query_doc = nlp(query.lower())
+    best_label = None
+    best_score = 0
+
+    for label in labels:
+        label_doc = nlp(label.lower())
+        similarity = query_doc.similarity(label_doc)
+        if similarity > best_score and similarity >= threshold:
+            best_score = similarity
+            best_label = label
+
+    return best_label
+
+def search_items_by_label(query, cutoff=0.6):
+    query = query.strip().lower()
+    item_history = load_item_history()
+    results = []
+
+    # Step 1: Fuzzy Match
+    for item in item_history:
+        if item["status"] != "available":
+            continue
+        label = item["label"].lower()
+        score = difflib.SequenceMatcher(None, query, label).ratio()
+        if score >= cutoff:
+            results.append({
+                "id": item["id"],
+                "label": item["label"],
+                "color": item["color"],
+                "date": item["date"],
+                "description": item["description"],
+                "location": item["location"],
+                "image": item["image"],
+                "secondImage": item["secondImage"]
+            })
+
+    # Step 2: If nothing found, try semantic match using spaCy
+    if not results:
+        labels = set(item["label"] for item in item_history)
+        closest_label = get_closest_label_spacy(query, labels)
+
+        if closest_label:
+            for item in item_history:
+                if item["label"].lower() == closest_label.lower() and item["status"] == "available":
+                    results.append({
+                        "id": item["id"],
+                        "label": item["label"],
+                        "color": item["color"],
+                        "description": item["description"],
+                        "location": item["location"],
+                        "image": item["image"],
+                        "secondImage": item["secondImage"]
+                    })
+
+    return results
