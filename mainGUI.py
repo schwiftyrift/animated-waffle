@@ -19,7 +19,9 @@ def launch_gui():
 
     root = Tk()
     root.title("Lost and Found System")
-    root.attributes("-fullscreen", True)
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    root.geometry(f"{screen_width}x{screen_height}")
     root.configure(bg="#1e1f1e")
     root.bind('<Escape>', lambda e: root.quit())
 
@@ -39,15 +41,6 @@ def launch_gui():
     top_bar = Frame(root, bg="#1e1f1e")
     top_bar.pack(side=TOP, fill=X)
 
-
-
-
-
-    '''
-    login_button = Button(top_bar, text="Login for Item Search", command=lambda: open_login_window(), bg='white', font=("Helvetica", 12))
-    login_button.pack(side=RIGHT, padx=20, pady=5)
-    '''
-
     logout_button = Button(top_bar, text="Logout", command=lambda: logout(), bg='white', font=("Arial", 12))
     
     def on_tab_changed(event):
@@ -65,26 +58,32 @@ def launch_gui():
     notebook.bind("<<NotebookTabChanged>>", on_tab_changed)
     kiosk_frame = Frame(notebook, bg="#1e1f1e")
     user_gui_frame = Frame(notebook, bg="#1e1f1e")
+    admin_frame = Frame(notebook, bg="#1e1f1e")
 
     notebook.add(kiosk_frame, text="Item Detection")
     notebook.add(user_gui_frame, text="Item Search")
 
-    # Disable Item Search tab initially
-    #notebook.tab(1, state='disabled')
-
     run_kiosk_gui(kiosk_frame)
 
     def logout():
-            nonlocal logged_in
-            notebook.select(0)
-            logout_button.pack_forget()
-            logged_in = False
+        nonlocal logged_in
+        notebook.select(0)
+        top_bar.pack_forget()  # hides top bar and its children
+        logged_in = False
 
-            for widget in user_gui_frame.winfo_children():
-                widget.destroy()
-            user_gui_frame.pack_forget()
+        for widget in user_gui_frame.winfo_children():
+            widget.destroy()
+        user_gui_frame.pack_forget()
 
-            messagebox.showinfo("Logged Out", "You have been logged out.")
+        admin_index = None
+        for i in range(notebook.index("end")):
+            if notebook.tab(i, "text") == "Admin Panel":
+                admin_index = i
+                break
+        if admin_index is not None:
+            notebook.forget(admin_index)
+
+        messagebox.showinfo("Logged Out", "You have been logged out.")
 
     def open_login_window():
 
@@ -121,7 +120,7 @@ def launch_gui():
                     return
 
                 from UserData import register_user  # import here to avoid circular imports if necessary
-                success = register_user(cwid, password, name)
+                success = register_user(cwid, password, name, "user")
                 if not success:
                     messagebox.showerror("Error", "An account already exists with this CWID", parent=create_win)
                 else:
@@ -182,6 +181,7 @@ def launch_gui():
         if storedUser and storedPass:
             checkValue.set(1)
 
+        from UserData import isAdmin
         def attempt_login():
             from UserData import isUser
             nonlocal logged_in
@@ -189,15 +189,24 @@ def launch_gui():
             password = pass_entry.get()
             success = login(cwid, password)
             isCurrentUser = isUser(cwid)
+
             if success:
                 messagebox.showinfo("Login", "Login Successful!")
                 run_user_gui(user_gui_frame, cwid)
                 save_credentials(cwid, password, checkValue.get())
                 notebook.tab(1, state='normal')
                 notebook.select(1)
+                top_bar.pack(side=TOP, fill=X)
+                logout_button.pack(side=RIGHT, padx=20, pady=5)  # Show logout
+
+                if isAdmin(cwid):
+                    notebook.add(admin_frame, text="Admin Panel")
+                    from adminGUI import run_admin_gui
+                    run_admin_gui(admin_frame, cwid)
+                
                 login_win.destroy()
                 logged_in = True
-                logout_button.pack(side=RIGHT, padx=20, pady=5)  # Show logout
+                            
             elif(not isCurrentUser):
                 messagebox.showerror("Error", "CWID is not registered, please create an account")
                 pass_entry.delete(0, tk.END)

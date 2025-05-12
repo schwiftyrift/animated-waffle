@@ -5,20 +5,16 @@ import os
 from PIL import Image, ImageTk
 from playsound import playsound
 import threading
-from Database import search_items_by_label, claim_item
-from UserData import change_password, check_old_password, retrieveNotifications, createNotification, remove_notification
+from Database import lookup_items_by_claim, checkout_item, clear_claimed
+from UserData import change_password, check_old_password, retrieveNotifications, remove_notification
 import sys
 import json
 from tkinter import messagebox
 import subprocess
-from datetime import datetime
 
-def run_user_gui(parent, user):
+def run_admin_gui(parent, user):
 
     current_item_id = [None]
-
-    def get_current_date():
-        return datetime.now().strftime("%Y-%m-%d: %H:%M")
 
     def load_user_data():
         with open("user_data.json", "r") as f:
@@ -28,10 +24,10 @@ def run_user_gui(parent, user):
         user_data = load_user_data()
         return user_data.get(user, {}).get("name", None)
 
-    username = get_user_name(user)
+    username = get_user_name(user)  
     popup = None
 
-    notifications_list = retrieveNotifications(user)
+    notifications_list = retrieveNotifications("admin")
     notification_count = StringVar()
     notification_count.set(f"🔔 {len(notifications_list)}")
 
@@ -82,19 +78,21 @@ def run_user_gui(parent, user):
         else:
             Label(rightFrame, text="Image not available", font=("Helvetica", 12, "italic"), bg="#2c2c2c", fg="gray").pack(pady=10)
 
-        Button(rightFrame, text="Claim", command=claim_item_gui).pack(pady=10)
+        button_frame = Frame(rightFrame, bg="#1e1f1e")
+        button_frame.pack(pady=10)
+        button_frame.pack_configure(anchor="center")
 
-    def claim_item_gui():
+        Button(button_frame, text="Checkout", command=checkout).pack(side=LEFT, padx=5)
+        Button(button_frame, text="Clear Claim", command=clearClaim).pack(side=LEFT, padx=5)
+
+    def clearClaim():
         if current_item_id[0] is None:
             messagebox.showerror("Error", "No item selected to claim.")
             return
-        date = get_current_date()
-        item_id = current_item_id[0]
-        message = user + " has claimed item " + item_id
-        createNotification("admin", message, date)
-        claim_item(item_id, user)
         
-        messagebox.showinfo("Success", f"Item {item_id} claimed!")
+        item_id = current_item_id[0]
+        clear_claimed(item_id)
+
 
     def open_settings(username):
         popup = Toplevel(parent)
@@ -155,7 +153,6 @@ def run_user_gui(parent, user):
             Button(pass_popup, text="Change Password", command=changePass).pack(pady=(10, 5))
             Button(pass_popup, text="Exit", command=pass_popup.destroy).pack(pady=(10, 5))
 
-
         Label(popup, text=username, font=("Helvetica", 14), bg="#2b2b2b", fg="white").pack(pady=10)
         emailFrame = Frame(popup, bg="#2b2b2b")
         emailFrame.pack(pady=(0, 10))
@@ -170,6 +167,16 @@ def run_user_gui(parent, user):
         bottomFrame.pack(pady = 20)
 
         Button(bottomFrame, text="Exit", command = popup.destroy).pack(side= LEFT)
+
+    def checkout():
+        if current_item_id[0] is None:
+            messagebox.showerror("Error", "No item selected to claim.")
+            return
+        item_id = current_item_id[0]
+        message = user + " has claimed item " + item_id
+        checkout_item(item_id)
+        
+        messagebox.showinfo("Success", f"Item {item_id} checked-out!")
 
     def on_item_click(event):
         selected_item = search_results.focus()
@@ -216,7 +223,7 @@ def run_user_gui(parent, user):
         '''
 
         # Refresh results regardless of popup state
-        results = search_items_by_label(search)
+        results = lookup_items_by_claim(search)
         for row in search_results.get_children():
             search_results.delete(row)
 
@@ -241,7 +248,7 @@ def run_user_gui(parent, user):
             for widget in notification_frame.winfo_children():
                 widget.destroy()
 
-            notifications = retrieveNotifications(username)
+            notifications = retrieveNotifications("admin")
 
             for note in notifications:
                 frame = Frame(notification_frame, bg="#E1F5FE", bd=1, relief="solid")
@@ -273,6 +280,14 @@ def run_user_gui(parent, user):
 
         refresh_notifications(user, notification_frame)
         notification_popup.grab_set()
+
+
+    def periodic_notification_check():
+        updated_notifications = retrieveNotifications("admin")
+        notification_count.set(f"🔔 {len(updated_notifications)}")
+        # Reschedule the check in 5 seconds (5000 milliseconds)
+        parent.after(5000, periodic_notification_check)
+
     ##############################################################################################
 
     style = ttk.Style()
@@ -284,11 +299,12 @@ def run_user_gui(parent, user):
     # --- Layout Frame ---
     main_frame = Frame(parent, bg="#1e1f1e")
     main_frame.pack(fill = BOTH, expand= True)
+    periodic_notification_check()
 
     titleFrame = Frame(main_frame, bg="#1e1f1e")
     titleFrame.pack(side = TOP)
 
-    titleLabel = Label(titleFrame, text = "Lost and Found", font=("Helvetica", 18), bg="#1e1f1e", fg = "white")
+    titleLabel = Label(titleFrame, text = "Lost and Found Admin", font=("Helvetica", 18), bg="#1e1f1e", fg = "white")
     titleLabel.pack(side = RIGHT, pady=10)
 
     searchFrame = Frame(main_frame, bg="#1e1f1e")
