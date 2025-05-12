@@ -42,7 +42,9 @@ class Item:
             "image": self.image,
             "secondImage": self.secondImage,
             "location": self.location,
-            "status": "available"
+            "status": "available",
+            "claimed_by": "",
+            "checkedOutTo": ""
 
         }
     
@@ -115,6 +117,8 @@ def checkout_item(item_id):
     for item in item_history:
         if item["id"] == item_id and item["status"] == "available":
             item["status"] = "checked-out"
+            item["checkedOutTo"] = item["claimed_by"]
+            item["claimed_by"] = ""
             updated = True
             break
 
@@ -187,3 +191,44 @@ def search_items_by_label(query, cutoff=0.6):
                     })
 
     return results
+
+def claim_item(item_id, cwid):
+    item_history = load_item_history()
+    updated = False
+
+    for item in item_history:
+        if item["id"] == item_id and item["status"] == "available":
+            item["claimed_by"] = cwid
+            updated = True
+            break
+
+    if updated:
+        save_item_history(item_history)
+        return True
+    else:
+        return False  # Item not available to claim
+    
+def lookup_items_by_claim(cwid):
+    item_history = load_item_history()
+    claimed_items = []
+
+    for item in item_history:
+        if item.get("claimed_by") == cwid:
+            claimed_items.append(item)
+
+    return claimed_items
+
+def clear_claimed(item_id):
+    item_history = load_item_history()
+    updated = False
+
+    for item in item_history:
+        if item["id"] == item_id and item["status"] == "available":
+            item["checkedOutTo"] = ""
+            item["claimed_by"] = ""
+            updated = True
+            break
+
+    if updated:
+        save_item_history(item_history)
+        return True

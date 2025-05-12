@@ -1,8 +1,10 @@
 import json
 import os
+from random import randint
 
 # File path for storing user credentials
 user_data_file = "user_data.json"
+notification_file = "notifications.json"
 
 # File helpers to load and save user data
 def load_user_data():
@@ -15,8 +17,15 @@ def save_user_data(user_data):
     with open(user_data_file, "w") as file:
         json.dump(user_data, file, indent=4)
 
+
+def load_notification():
+    if os.path.exists(notification_file):
+        with open(notification_file, "r") as file:
+            return json.load(file)
+    return []
+
 # 1. User Registration: Prompt user to create a username and password
-def register_user(username, password, name):
+def register_user(username, password, name, userType):
     user_data = load_user_data()
 
     if username in user_data:
@@ -25,7 +34,8 @@ def register_user(username, password, name):
 
     user_data[username] = {
         "password": password,
-        "name": name
+        "name": name,
+        "userType": userType
     }
 
     save_user_data(user_data)
@@ -85,7 +95,48 @@ def isUser(username):
         return False
 
     return True
+
+def isAdmin(username):
+    user_data = load_user_data()
+    return user_data.get(username, {}).get("userType") == "admin"
+
+def createNotification(username, message, date):
+    id = "".join(str(randint(0, 9)) for _ in range(16))
+    notification_data = load_notification()
     
+    notification_data[id] = {
+        "recipient": username,
+        "message": message,
+        "date": date
+        }
+    
+    with open("notifications.json", "w") as f:
+        json.dump(notification_data, f, indent=4)
+
+
+def retrieveNotifications(username):
+    notification_history = load_notification()  # dict of notif_id: notif_data
+    results = []
+
+    for notif_id, notif in notification_history.items():
+        if notif.get("recipient") == username:
+            results.append({
+                "id": notif_id,
+                "message": notif.get("message"),
+                "date": notif.get("date")
+            })
+
+    return results
+
+def remove_notification(notification_id):
+    with open("notifications.json", "r") as f:
+        notifications = json.load(f)
+
+    if notification_id in notifications:
+        del notifications[notification_id]
+
+        with open("notifications.json", "w") as f:
+            json.dump(notifications, f, indent=4)
 
 
 """""""""

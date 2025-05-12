@@ -85,7 +85,7 @@ def run_kiosk_gui(parent):
         padx=20,
         pady=10
     )
-    detect_button.pack(pady= 20)
+    detect_button.pack(pady= 10)
 
     title = Label(
         right_frame,
